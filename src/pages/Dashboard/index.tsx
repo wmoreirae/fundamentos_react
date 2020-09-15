@@ -8,7 +8,7 @@ import api from '../../services/api';
 
 import Header from '../../components/Header';
 
-import formatValue from '../../utils/formatValue';
+// import formatValue from '../../utils/formatValue';
 
 import { Container, CardContainer, Card, TableContainer } from './styles';
 
@@ -23,6 +23,15 @@ interface Transaction {
   created_at: Date;
 }
 
+type OmitTransaction = Omit<
+  Transaction,
+  'formattedValue' | 'formattedDate' | 'created_at'
+>;
+
+interface BaseTransaction extends OmitTransaction {
+  created_at: string;
+}
+
 interface Balance {
   income: string;
   outcome: string;
@@ -30,12 +39,57 @@ interface Balance {
 }
 
 const Dashboard: React.FC = () => {
-  // const [transactions, setTransactions] = useState<Transaction[]>([]);
-  // const [balance, setBalance] = useState<Balance>({} as Balance);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [balance, setBalance] = useState<Balance>({} as Balance);
+  const [error, setError] = useState<string>('');
+  const [loaded, setLoaded] = useState<boolean>(false);
+
+  const f = (x: number): string => {
+    return Intl.NumberFormat('pt', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(x);
+  };
+
+  const d = (x: string): string => {
+    return Intl.DateTimeFormat('pt').format(Date.parse(x));
+  };
 
   useEffect(() => {
     async function loadTransactions(): Promise<void> {
-      // TODO
+      try {
+        const { data } = await api.get('transactions');
+        // TODO ajustar a função para carregar os dados e criar os valores inexistentes presente na interface
+        const baseTransaction: BaseTransaction[] = data.transactions;
+
+        const augmentedTransactions: Transaction[] = baseTransaction.map(e => {
+          const mappedValue: Transaction = {
+            category: e.category,
+            // eslint-disable-next-line @typescript-eslint/camelcase
+            created_at: new Date(Date.parse(e.created_at)),
+            id: e.id,
+            title: e.title,
+            type: e.type,
+            value: e.value,
+            formattedDate: d(e.created_at),
+            formattedValue: f(e.value),
+          };
+          return mappedValue;
+        });
+        const simpleBalance = data.balance;
+        const augmentedBalance: Balance = {
+          income: f(simpleBalance.income),
+          outcome: f(simpleBalance.outcome),
+          total: f(simpleBalance.total),
+        };
+
+        setTransactions(augmentedTransactions);
+        setBalance(augmentedBalance);
+        setLoaded(true);
+      } catch (err) {
+        // setLoaded(true);
+        setError('Não foi possível carregar os dados');
+      }
     }
 
     loadTransactions();
@@ -43,60 +97,72 @@ const Dashboard: React.FC = () => {
 
   return (
     <>
-      <Header />
-      <Container>
-        <CardContainer>
-          <Card>
-            <header>
-              <p>Entradas</p>
-              <img src={income} alt="Income" />
-            </header>
-            <h1 data-testid="balance-income">R$ 5.000,00</h1>
-          </Card>
-          <Card>
-            <header>
-              <p>Saídas</p>
-              <img src={outcome} alt="Outcome" />
-            </header>
-            <h1 data-testid="balance-outcome">R$ 1.000,00</h1>
-          </Card>
-          <Card total>
-            <header>
-              <p>Total</p>
-              <img src={total} alt="Total" />
-            </header>
-            <h1 data-testid="balance-total">R$ 4000,00</h1>
-          </Card>
-        </CardContainer>
+      {loaded && (
+        <>
+          <Header />
+          <Container>
+            <CardContainer>
+              <Card>
+                <header>
+                  <p>Entradas</p>
+                  <img src={income} alt="Income" />
+                </header>
+                <h1 data-testid="balance-income">
+                  R$
+                  {balance.income}
+                </h1>
+              </Card>
+              <Card>
+                <header>
+                  <p>Saídas</p>
+                  <img src={outcome} alt="Outcome" />
+                </header>
+                <h1 data-testid="balance-outcome">
+                  R$
+                  {balance.outcome}
+                </h1>
+              </Card>
+              <Card total>
+                <header>
+                  <p>Total</p>
+                  <img src={total} alt="Total" />
+                </header>
+                <h1 data-testid="balance-total">
+                  R$
+                  {balance.total}
+                </h1>
+              </Card>
+            </CardContainer>
 
-        <TableContainer>
-          <table>
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Preço</th>
-                <th>Categoria</th>
-                <th>Data</th>
-              </tr>
-            </thead>
+            <TableContainer>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Título</th>
+                    <th>Preço</th>
+                    <th>Categoria</th>
+                    <th>Data</th>
+                  </tr>
+                </thead>
 
-            <tbody>
-              <tr>
-                <td className="title">Computer</td>
-                <td className="income">R$ 5.000,00</td>
-                <td>Sell</td>
-                <td>20/04/2020</td>
-              </tr>
-              <tr>
-                <td className="title">Website Hosting</td>
-                <td className="outcome">- R$ 1.000,00</td>
-                <td>Hosting</td>
-                <td>19/04/2020</td>
-              </tr>
-            </tbody>
-          </table>
-        </TableContainer>
-      </Container>
+                <tbody>
+                  {transactions.map(e => (
+                    <tr>
+                      <td className="title">{`${e.title}`}</td>
+                      <td className={e.type}>
+                        {`${e.type === 'income' ? '' : '- '}
+                          ${e.formattedValue}`}
+                      </td>
+                      <td>{e.category.title}</td>
+                      <td>{e.formattedDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableContainer>
+          </Container>
+        </>
+      )}
     </>
   );
 };
