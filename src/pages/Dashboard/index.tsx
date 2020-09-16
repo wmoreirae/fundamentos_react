@@ -8,7 +8,7 @@ import api from '../../services/api';
 
 import Header from '../../components/Header';
 
-// import formatValue from '../../utils/formatValue';
+import formatValue from '../../utils/formatValue';
 
 import { Container, CardContainer, Card, TableContainer } from './styles';
 
@@ -43,12 +43,14 @@ const Dashboard: React.FC = () => {
   const [balance, setBalance] = useState<Balance>({} as Balance);
   const [error, setError] = useState<string>('');
   const [loaded, setLoaded] = useState<boolean>(false);
+  const [update, setUpdate] = useState<boolean>(false);
 
   const f = (x: number): string => {
-    return Intl.NumberFormat('pt', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(x);
+    return formatValue(x);
+    // return Intl.NumberFormat('pt', {
+    //   minimumFractionDigits: 2,
+    //   maximumFractionDigits: 2,
+    // }).format(x);
   };
 
   const d = (x: string): string => {
@@ -86,6 +88,7 @@ const Dashboard: React.FC = () => {
         setTransactions(augmentedTransactions);
         setBalance(augmentedBalance);
         setLoaded(true);
+        setUpdate(false);
       } catch (err) {
         // setLoaded(true);
         setError('Não foi possível carregar os dados');
@@ -93,7 +96,16 @@ const Dashboard: React.FC = () => {
     }
 
     loadTransactions();
-  }, []);
+  }, [update]);
+
+  const handleRemove = async (id: string) => {
+    try {
+      await api.delete(`transactions/${id}`);
+      setUpdate(true);
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
   return (
     <>
@@ -148,7 +160,9 @@ const Dashboard: React.FC = () => {
                 <tbody>
                   {transactions.map(e => (
                     <tr>
-                      <td className="title">{`${e.title}`}</td>
+                      <td className="title" onClick={() => handleRemove(e.id)}>
+                        {`${e.title}`}
+                      </td>
                       <td className={e.type}>
                         {`${e.type === 'income' ? '' : '- '}
                           ${e.formattedValue}`}
